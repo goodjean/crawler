@@ -2,9 +2,9 @@ import { Builder, By } from "selenium-webdriver";
 import "chromedriver";
 import LensMeCrawler from "../brands/lensMeCrawler.js";
 
-(async function mainCrawler() {
-  let crawler = new LensMeCrawler();
+(async function helloSelenium() {
   const lens_list_entity = [];
+  const crawler = new LensMeCrawler();
   let driver = await crawler.goMainPage();
   const categories = await crawler.getCategories(driver);
   const elements = await crawler.getElements(driver);
@@ -14,7 +14,7 @@ import LensMeCrawler from "../brands/lensMeCrawler.js";
     await driver.executeScript(
       "return document.getElementsByClassName('inner_bts bg_header')[0].remove();"
     );
-    await crawler.clickElement(categories[i]);
+    await crawler.clickElement(driver, categories[i]);
 
     for (let j = 0; j < 10; j++) {
       await driver.executeScript(
@@ -25,7 +25,7 @@ import LensMeCrawler from "../brands/lensMeCrawler.js";
       const price = await crawler.getProductPrice(elements[j]);
       const graphic = await crawler.getProductGraphic(elements[j]);
       const img = await crawler.getProductImg(elements[j]);
-      await crawler.clickElement(elements[j]);
+      await crawler.clickElement(driver, elements[j]);
       const currentUrl = await driver.getCurrentUrl();
       const ref_id = await crawler.getProductRefId(currentUrl);
       await driver.navigate().back();

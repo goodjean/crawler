@@ -13,7 +13,7 @@ import OlensCrawler from "../brands/olensCrawler.js";
     const categories = await crawler.getCategories(driver);
     await crawler.clickElement(driver, categories[i]);
 
-    for (let j = 0; j < elements.length; j++) {
+    for (let j = 0; j < 10; j++) {
       const categories = await crawler.getCategories(driver);
       await crawler.clickElement(driver, categories[i]);
       const elements = await crawler.getElements(driver);

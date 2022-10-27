@@ -16,7 +16,7 @@ export default class LensMeCrawler {
       By.css(lensMeConfig.products_selector.productList)
     );
   }
-  async clickElement(element) {
+  async clickElement(driver, element) {
     await element.click();
   }
   async getProductName(element) {

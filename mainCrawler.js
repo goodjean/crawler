@@ -1,13 +1,12 @@
-//merge olens+lensme
-// + mysql(field3)
-//테스트해보기
 import "chromedriver";
 import LensMeCrawler from "./brands/lensMeCrawler.js";
 import OlensCrawler from "./brands/olensCrawler.js";
+import LensRepo from "./db/LensRepo.js";
 
 (async function mainCrawler() {
-  const lens_list_entity = [];
+  const lensRepo = new LensRepo();
   const brands = [LensMeCrawler, OlensCrawler];
+  const lens_list_entity = [];
 
   for await (let brand of brands) {
     const crawler = new brand();
@@ -64,5 +63,5 @@ import OlensCrawler from "./brands/olensCrawler.js";
     }
     await driver.quit();
   }
-  console.log(lens_list_entity);
+  lensRepo.addLensEntity(lens_list_entity);
 })();

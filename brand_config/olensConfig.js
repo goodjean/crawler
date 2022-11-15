@@ -1,0 +1,22 @@
+export default {
+  products: [],
+  brand_name: "olens",
+  review: ["리뷰 "],
+  url: "https://o-lens.com/main/AllMenu",
+  categories: ".gnb-link-cr > li > a",
+  ref_url: "https://o-lens.com/product/detail?productSeq=",
+  products_selector: {
+    productList: [".prod1-item", ".prod2-item"],
+    productImg: ".imgs > img",
+    productDetailThumbs: ".pinch-zoom-content > img",
+    productDetailImg: ".product-detail-desc > div > p > p:nth-child(2)",
+    productName: ".text > h4",
+    productColor: "li.on > a > span.tx",
+    productColorImg: ".img > img",
+    productPrice: ".tit > p > span > span.price-last",
+    productGraphic: ".dd > span",
+    productPeriod: ".bar",
+    productReviewCount: ".product-review > h3",
+  },
+  a_tag: false,
+};

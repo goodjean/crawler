@@ -18,5 +18,7 @@ export default {
     productPeriod: ".bar",
     productReviewCount: ".product-review > h3",
   },
-  a_tag: false,
+  isColor: true,
+  dynamicUrl: false,
+  product_a_tag: false,
 };

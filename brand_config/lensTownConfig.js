@@ -20,5 +20,7 @@ export default {
       ".detail_info > .detail_info_items:nth-child(1) > .detail_info_right",
     productReviewCount: ".item_use_count",
   },
-  a_tag: true,
+  isColor: true,
+  dynamicUrl: false,
+  product_a_tag: true,
 };

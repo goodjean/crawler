@@ -1,10 +1,8 @@
-import { Builder, By, Key } from "selenium-webdriver";
-import { Driver } from "selenium-webdriver/chrome.js";
-import { addConsoleHandler } from "selenium-webdriver/lib/logging.js";
+import { Builder, By } from "selenium-webdriver";
+import "chromedriver";
 import lensTownConfig from "./brand_config/lensTownConfig.js";
 import olensConfig from "./brand_config/olensConfig.js";
-import hapakristinConfig from "./brand_config/hapakristinConfig.js";
-import CrawlerApi from "./crawler_api/crawlerApi.js";
+import lensmeConfig from "./brand_config/lensmeConfig.js";
 import LensRepo from "./db/LensRepo.js";
 
 //--------------------------- Crawler Api --------------------------------
@@ -18,16 +16,12 @@ async function goMainPage(config) {
 
 async function getCategories(driver, config) {
   const categories = await driver.findElements(By.css(config.categories));
-  try {
-    const urls = [];
-    for (let i = 0; i < categories.length; i++) {
-      const url = await categories[i].getAttribute("href");
-      urls.push(url);
-    }
-    return urls;
-  } catch (e) {
-    return categories;
+  const urls = [];
+  for (let i = 0; i < categories.length; i++) {
+    const url = await categories[i].getAttribute("href");
+    urls.push(url);
   }
+  return urls;
 }
 
 async function goCategory(category, driver) {
@@ -50,11 +44,17 @@ async function getProducts(driver, config) {
 }
 
 async function clickProduct(driver, product, config) {
-  if (config.a_tag) {
-    await product.click();
+  if (config.product_a_tag) {
+    try {
+      await product.click();
+    } catch (e) {
+      const clickableDetailUrl = await product
+        .findElement(By.css(config.products_selector.productName))
+        .getAttribute("href");
+      await driver.get(clickableDetailUrl);
+    }
   } else {
     await driver.executeScript("arguments[0].click();", product);
-    // await driver.sleep(2000);
   }
 }
 
@@ -73,10 +73,17 @@ async function getReviewCount(driver, config) {
 
 async function getDetailImg(driver, config) {
   try {
-    const detailImgEle = await driver.findElement(
-      By.css(config.products_selector.productDetailImg)
-    );
-    return await detailImgEle.findElement(By.css("img")).getAttribute("src");
+    if (config.brand_name === "lensme") {
+      const detailImgEles = await driver.findElements(
+        By.css(config.products_selector.productDetailImg)
+      );
+      return await detailImgEles[detailImgEles.length - 1].getAttribute("src");
+    } else {
+      const detailImgEle = await driver.findElement(
+        By.css(config.products_selector.productDetailImg)
+      );
+      return await detailImgEle.findElement(By.css("img")).getAttribute("src");
+    }
   } catch (e) {
     console.log("디테일 이미지 없음");
   }
@@ -93,8 +100,38 @@ async function getDetailThumbs(driver, config) {
       detail.push(detailThumb);
     }
   }
-  console.log(`[detailThumbs]: ${detail[0]}, ${detail[1]}`);
+  // console.log(`[detailThumbs]: ${detail[0]}, ${detail[1]}`);
   return detail;
+}
+
+async function getProductColor(driver, config) {
+  const color = await driver
+    .findElement(By.css(config.products_selector.productColor))
+    .getText();
+  if (config.isColor) {
+    return color;
+  } else {
+    const colorArr = color
+      .replace(/10P/i, "")
+      .replace(/30P/i, "")
+      .replace(/S/i, "")
+      .replace(/M/i, "")
+      .replace(/L/i, "")
+      .replace(" ()", "")
+      .replace("쵸코", "초코")
+      .split(" ");
+    return colorArr[colorArr.length - 1];
+  }
+}
+
+async function getProductColorImg(driver, config) {
+  try {
+    return await driver
+      .findElement(By.css(config.products_selector.productColorImg))
+      .getAttribute("src");
+  } catch (e) {
+    return "";
+  }
 }
 
 async function getProductPrice(driver, config) {
@@ -107,32 +144,47 @@ async function getProductPrice(driver, config) {
 }
 
 async function getProductGraphic(driver, config) {
-  const graphicAlpha = await driver
-    .findElement(By.css(config.products_selector.productGraphic))
-    .getText();
-  const graphic = Number(graphicAlpha.substr(0, 4));
-  console.log(`[Graphic]: ${graphic}`);
-  return graphic;
+  try {
+    const graphicAlpha = await driver
+      .findElement(By.css(config.products_selector.productGraphic))
+      .getText();
+    const graphic = Number(graphicAlpha.substr(0, 4));
+    if (isNaN(graphic)) {
+      return 0;
+    } else {
+      return graphic;
+    }
+  } catch (e) {
+    return 0;
+  }
 }
 
 async function getProductPeriod(driver, config) {
   const periodList = ["1day", "2weeks", "1month", "3month", "6month", "1year"];
-  const periodAlpha = await driver
-    .findElement(By.css(config.products_selector.productPeriod))
-    .getText();
-  const periodEntity = periodAlpha.split(/[·,/]/)[0];
-  const period = periodEntity
-    .replace(/1day /gi, periodList[0])
-    .replace(/2weeks /gi, periodList[1])
-    .replace(/1month/gi, periodList[2])
-    .replace(/3months/gi, periodList[3])
-    .replace(/6months/gi, periodList[4])
-    .replace(/1 year/gi, periodList[5])
-    .replace(/1개월 /gi, periodList[2])
-    .replace(/2~3개월 /gi, periodList[3])
-    .replace(/3~6개월 /gi, periodList[4]);
-  // console.log(`[period]: '${period}'`);
-  return period;
+  try {
+    const periodAlpha = await driver
+      .findElement(By.css(config.products_selector.productPeriod))
+      .getText();
+    if (!periodAlpha.includes("~")) {
+      const periodEntity = periodAlpha.split(/[·,/]/)[0];
+      const period = periodEntity
+        .replace(/1day /gi, periodList[0])
+        .replace(/2weeks /gi, periodList[1])
+        .replace(/1month /gi, periodList[2])
+        .replace(/3months /gi, periodList[3])
+        .replace(/6months /gi, periodList[4])
+        .replace(/1 year /gi, periodList[5])
+        .replace(/1개월 /gi, periodList[2])
+        .replace(/2~3개월 /gi, periodList[3])
+        .replace(/3~6개월 /gi, periodList[4]);
+      // console.log(`[period]: '${period}'`);
+      return period;
+    } else {
+      return periodList[4];
+    }
+  } catch (e) {
+    return periodList[4];
+  }
 }
 
 async function getProductPeriodClassifi(period) {
@@ -151,11 +203,21 @@ async function getProductPeriodClassifi(period) {
       period_classifi = "long-term";
       break;
     default:
-      period;
+      period_classifi = period;
       break;
   }
   console.log(`[period_classifi]: ${period_classifi}`);
   return period_classifi;
+}
+
+async function getProductRefId(driver, config) {
+  const currentUrl = await driver.getCurrentUrl();
+  if (!config.dynamicUrl) {
+    return Number(currentUrl.replace(config.ref_url, ""));
+  } else {
+    const pathArr = currentUrl.split("/");
+    return Number(pathArr[5]);
+  }
 }
 
 function getProduct(
@@ -200,6 +262,7 @@ async function crawlDetail(driver, product, config) {
   const name = await product
     .findElement(By.css(config.products_selector.productName))
     .getText();
+  console.log(name);
   const img = await product
     .findElement(By.css(config.products_selector.productImg))
     .getAttribute("src");
@@ -207,19 +270,14 @@ async function crawlDetail(driver, product, config) {
   const reviewCount = await getReviewCount(driver, config);
   const detailImg = await getDetailImg(driver, config);
   const detailThumbs = await getDetailThumbs(driver, config);
-  const color = await driver
-    .findElement(By.css(config.products_selector.productColor))
-    .getText();
-  const colorImg = await driver
-    .findElement(By.css(config.products_selector.productColorImg))
-    .getAttribute("src");
+  const color = await getProductColor(driver, config);
+  const colorImg = await getProductColorImg(driver, config);
   const price = await getProductPrice(driver, config);
   const graphic = await getProductGraphic(driver, config);
-  console.log(`[product-img]: ${colorImg}`);
+  console.log(graphic);
   const period = await getProductPeriod(driver, config);
   const periodClassification = await getProductPeriodClassifi(period);
-  const currentUrl = await driver.getCurrentUrl();
-  const ref_id = Number(currentUrl.replace(config.ref_url, ""));
+  const ref_id = await getProductRefId(driver, config);
   const crawlProduct = getProduct(
     ref_id,
     name,
@@ -243,13 +301,12 @@ async function crawlDetail(driver, product, config) {
 
 (async function main() {
   let LENS_LIST_ENTITY = [];
-  let configs = [lensTownConfig, olensConfig, hapakristinConfig];
+  let configs = [lensTownConfig, olensConfig, lensmeConfig];
   const lensRepo = new LensRepo();
-  // for(let config of configs) {
-  //   mainCrawler(config)
-  // }
-  await mainCrawler(configs[1]);
-  LENS_LIST_ENTITY.push(...configs[1].products);
+  for (let config of configs) {
+    await mainCrawler(config);
+    LENS_LIST_ENTITY.push(...config.products);
+  }
   lensRepo.addLensInfo(LENS_LIST_ENTITY);
 })();
 
@@ -258,11 +315,11 @@ async function crawlDetail(driver, product, config) {
 async function mainCrawler(config) {
   let driver = await goMainPage(config);
   const categories = await getCategories(driver, config);
-  console.log(categories.length);
 
   for (let i = 0; i < categories.length; i++) {
     await goCategory(categories[i], driver);
     const products = await getProducts(driver, config);
+
     for (let j = 0; j < products.length; j++) {
       const products = await getProducts(driver, config);
       await crawlDetail(driver, products[j], config);

@@ -1,10 +1,11 @@
 import mysql2 from "mysql2";
-import dbConfig from "./db_config/database.js";
+import { ILens } from "../types/lens";
+import dbConfig from "./db_config/database";
 
 const connection = mysql2.createConnection(dbConfig);
 
 export default class LensRepo {
-  addLensInfo(lensInfo) {
+  addLensInfo(lensInfo: ILens[]) {
     //중복체크 business에서
     lensInfo.forEach((lens) => {
       connection.query(

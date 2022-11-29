@@ -1,22 +1,27 @@
-import { Builder, By } from "selenium-webdriver";
+import { Builder, By, WebDriver, WebElement } from "selenium-webdriver";
 import "chromedriver";
-import lensTownConfig from "./brand_config/lensTownConfig.js";
-import olensConfig from "./brand_config/olensConfig.js";
-import lensmeConfig from "./brand_config/lensmeConfig.js";
-import LensRepo from "./db/LensRepo.js";
+import lensTownConfig from "./brand_config/lensTownConfig";
+import olensConfig from "./brand_config/olensConfig";
+import lensmeConfig from "./brand_config/lensmeConfig";
+import LensRepo from "./db/LensRepo";
+import { ILens } from "./types/lens";
+import { IBrandConfig } from "./types/config";
 
 //--------------------------- Crawler Api --------------------------------
 
-async function goMainPage(config) {
+async function goMainPage(config: IBrandConfig): Promise<WebDriver> {
   let driver = await new Builder().forBrowser("chrome").build();
   await driver.manage().setTimeouts({ implicit: 2000 });
   await driver.get(config.url);
   return driver;
 }
 
-async function getCategories(driver, config) {
+async function getCategories(
+  driver: WebDriver,
+  config: IBrandConfig
+): Promise<string[]> {
   const categories = await driver.findElements(By.css(config.categories));
-  const urls = [];
+  const urls: string[] = [];
   for (let i = 0; i < categories.length; i++) {
     const url = await categories[i].getAttribute("href");
     urls.push(url);
@@ -24,11 +29,14 @@ async function getCategories(driver, config) {
   return urls;
 }
 
-async function goCategory(category, driver) {
+async function goCategory(category: string, driver: WebDriver): Promise<void> {
   await driver.get(category);
 }
 
-async function getProducts(driver, config) {
+async function getProducts(
+  driver: WebDriver,
+  config: IBrandConfig
+): Promise<WebElement[]> {
   const products = await driver.findElements(
     By.css(config.products_selector.productList[0])
   );
@@ -43,7 +51,11 @@ async function getProducts(driver, config) {
   return products;
 }
 
-async function clickProduct(driver, product, config) {
+async function clickProduct(
+  driver: WebDriver,
+  product: WebElement,
+  config: IBrandConfig
+): Promise<void> {
   if (config.product_a_tag) {
     try {
       await product.click();
@@ -58,7 +70,10 @@ async function clickProduct(driver, product, config) {
   }
 }
 
-async function getReviewCount(driver, config) {
+async function getReviewCount(
+  driver: WebDriver,
+  config: IBrandConfig
+): Promise<number> {
   try {
     const reviewText = await driver
       .findElement(By.css(config.products_selector.productReviewCount))
@@ -71,7 +86,10 @@ async function getReviewCount(driver, config) {
   }
 }
 
-async function getDetailImg(driver, config) {
+async function getDetailImg(
+  driver: WebDriver,
+  config: IBrandConfig
+): Promise<string | undefined> {
   try {
     if (config.brand_name === "lensme") {
       const detailImgEles = await driver.findElements(
@@ -89,8 +107,11 @@ async function getDetailImg(driver, config) {
   }
 }
 
-async function getDetailThumbs(driver, config) {
-  let detail = [];
+async function getDetailThumbs(
+  driver: WebDriver,
+  config: IBrandConfig
+): Promise<string[]> {
+  let detail: string[] = [];
   const detailThumbEles = await driver.findElements(
     By.css(config.products_selector.productDetailThumbs)
   );
@@ -104,7 +125,10 @@ async function getDetailThumbs(driver, config) {
   return detail;
 }
 
-async function getProductColor(driver, config) {
+async function getProductColor(
+  driver: WebDriver,
+  config: IBrandConfig
+): Promise<string> {
   const color = await driver
     .findElement(By.css(config.products_selector.productColor))
     .getText();
@@ -124,17 +148,23 @@ async function getProductColor(driver, config) {
   }
 }
 
-async function getProductColorImg(driver, config) {
+async function getProductColorImg(
+  driver: WebDriver,
+  config: IBrandConfig
+): Promise<string | undefined> {
   try {
     return await driver
       .findElement(By.css(config.products_selector.productColorImg))
       .getAttribute("src");
   } catch (e) {
-    return "";
+    console.log("컬러 이미지 없음");
   }
 }
 
-async function getProductPrice(driver, config) {
+async function getProductPrice(
+  driver: WebDriver,
+  config: IBrandConfig
+): Promise<number> {
   const priceEntity = await driver
     .findElement(By.css(config.products_selector.productPrice))
     .getText();
@@ -143,7 +173,10 @@ async function getProductPrice(driver, config) {
   return price;
 }
 
-async function getProductGraphic(driver, config) {
+async function getProductGraphic(
+  driver: WebDriver,
+  config: IBrandConfig
+): Promise<number> {
   try {
     const graphicAlpha = await driver
       .findElement(By.css(config.products_selector.productGraphic))
@@ -159,7 +192,10 @@ async function getProductGraphic(driver, config) {
   }
 }
 
-async function getProductPeriod(driver, config) {
+async function getProductPeriod(
+  driver: WebDriver,
+  config: IBrandConfig
+): Promise<string> {
   const periodList = ["1day", "2weeks", "1month", "3month", "6month", "1year"];
   try {
     const periodAlpha = await driver
@@ -187,7 +223,7 @@ async function getProductPeriod(driver, config) {
   }
 }
 
-async function getProductPeriodClassifi(period) {
+function getProductPeriodClassifi(period: string): string {
   let period_classifi = "";
   switch (period) {
     case "1day":
@@ -206,11 +242,14 @@ async function getProductPeriodClassifi(period) {
       period_classifi = period;
       break;
   }
-  console.log(`[period_classifi]: ${period_classifi}`);
+  // console.log(`[period_classifi]: ${period_classifi}`);
   return period_classifi;
 }
 
-async function getProductRefId(driver, config) {
+async function getProductRefId(
+  driver: WebDriver,
+  config: IBrandConfig
+): Promise<number> {
   const currentUrl = await driver.getCurrentUrl();
   if (!config.dynamicUrl) {
     return Number(currentUrl.replace(config.ref_url, ""));
@@ -221,20 +260,20 @@ async function getProductRefId(driver, config) {
 }
 
 function getProduct(
-  ref_id,
-  name,
-  color,
-  colorImg,
-  price,
-  graphic,
-  img,
-  detailImg,
-  detailThumbs,
-  period,
-  periodClassification,
-  reviewCount,
-  brand
-) {
+  ref_id: number,
+  name: string,
+  color: string,
+  colorImg: string | undefined,
+  price: number,
+  graphic: number,
+  img: string,
+  detailImg: string | undefined,
+  detailThumbs: string[],
+  period: string,
+  periodClassification: string,
+  reviewCount: number,
+  brand: string
+): ILens {
   return {
     ref_id,
     name,
@@ -252,13 +291,17 @@ function getProduct(
   };
 }
 
-async function goBackPage(driver) {
+async function goBackPage(driver: WebDriver): Promise<void> {
   await driver.navigate().back();
 }
 
 //--------------------------------crawlDetail-----------------------------------
 
-async function crawlDetail(driver, product, config) {
+async function crawlDetail(
+  driver: WebDriver,
+  product: WebElement,
+  config: IBrandConfig
+): Promise<void> {
   const name = await product
     .findElement(By.css(config.products_selector.productName))
     .getText();
@@ -274,7 +317,6 @@ async function crawlDetail(driver, product, config) {
   const colorImg = await getProductColorImg(driver, config);
   const price = await getProductPrice(driver, config);
   const graphic = await getProductGraphic(driver, config);
-  console.log(graphic);
   const period = await getProductPeriod(driver, config);
   const periodClassification = await getProductPeriodClassifi(period);
   const ref_id = await getProductRefId(driver, config);
@@ -300,8 +342,8 @@ async function crawlDetail(driver, product, config) {
 //----------------------------------- Main Exec ---------------------------------------
 
 (async function main() {
-  let LENS_LIST_ENTITY = [];
-  let configs = [lensTownConfig, olensConfig, lensmeConfig];
+  let LENS_LIST_ENTITY: ILens[] = [];
+  let configs: IBrandConfig[] = [lensTownConfig, olensConfig, lensmeConfig];
   const lensRepo = new LensRepo();
   for (let config of configs) {
     await mainCrawler(config);
@@ -312,7 +354,7 @@ async function crawlDetail(driver, product, config) {
 
 //----------------------------------- Main Crawler ----------------------------------------
 
-async function mainCrawler(config) {
+async function mainCrawler(config: IBrandConfig): Promise<void> {
   let driver = await goMainPage(config);
   const categories = await getCategories(driver, config);
 

@@ -4,7 +4,7 @@ import lensTownConfig from "./brand_config/lensTownConfig";
 import olensConfig from "./brand_config/olensConfig";
 import lensmeConfig from "./brand_config/lensmeConfig";
 import LensRepo from "./db/LensRepo";
-import { ILens } from "./types/lens";
+import { IBrands, IColors, IDays, ILens } from "./types/lens";
 import { IBrandConfig } from "./types/config";
 
 //--------------------------- Crawler Api --------------------------------
@@ -129,22 +129,66 @@ async function getProductColor(
   driver: WebDriver,
   config: IBrandConfig
 ): Promise<string> {
-  const color = await driver
-    .findElement(By.css(config.products_selector.productColor))
-    .getText();
-  if (config.isColor) {
-    return color;
+  try {
+    const color = await driver
+      .findElement(By.css(config.products_selector.productColor))
+      .getText();
+    if (config.isColor) {
+      return color;
+    } else {
+      const colorArr = color
+        .replace(/10P/i, "")
+        .replace(/30P/i, "")
+        .replace(/S/i, "")
+        .replace(/M/i, "")
+        .replace(/L/i, "")
+        .replace(" ()", "")
+        .replace("쵸코", "초코")
+        .split(" ");
+      return colorArr[colorArr.length - 1];
+    }
+  } catch (e) {
+    return await driver
+      .findElement(By.css("ul > li:nth-child(4) > div.sct_txt > a"))
+      .getText();
+  }
+}
+
+function findColorEntityId(colorEntity: IColors[], color: string): number {
+  const EntityByColor = colorEntity.find((cl) => cl.color === color);
+  if (!EntityByColor) {
+    throw "No color Entity";
+  }
+  return EntityByColor.id;
+}
+
+function getProductColorId(color: string, colorEntity: IColors[]): number {
+  const colors = {
+    brown: ["브라운", "베이지", "카카오", "코코아", "헤이즐"],
+    choco: ["에스프레소", "초코", "카푸치노"],
+    gray: ["그레이", "실버"],
+    pink: ["로즈", "버건디", "핑크", "바이올렛", "레드", "퍼플"],
+    black: ["블랙", "스모키", "샤갈", "BK"],
+    blue: ["베리", "블루", "오션"],
+    green: ["그린", "카키", "올리브"],
+  };
+
+  if (colors.brown.some((cl) => color.includes(cl))) {
+    return findColorEntityId(colorEntity, "브라운");
+  } else if (colors.choco.some((cl) => color.includes(cl))) {
+    return findColorEntityId(colorEntity, "초코");
+  } else if (colors.gray.some((cl) => color.includes(cl))) {
+    return findColorEntityId(colorEntity, "그레이");
+  } else if (colors.pink.some((cl) => color.includes(cl))) {
+    return findColorEntityId(colorEntity, "핑크");
+  } else if (colors.black.some((cl) => color.includes(cl))) {
+    return findColorEntityId(colorEntity, "블랙");
+  } else if (colors.blue.some((cl) => color.includes(cl))) {
+    return findColorEntityId(colorEntity, "블루");
+  } else if (colors.green.some((cl) => color.includes(cl))) {
+    return findColorEntityId(colorEntity, "그린");
   } else {
-    const colorArr = color
-      .replace(/10P/i, "")
-      .replace(/30P/i, "")
-      .replace(/S/i, "")
-      .replace(/M/i, "")
-      .replace(/L/i, "")
-      .replace(" ()", "")
-      .replace("쵸코", "초코")
-      .split(" ");
-    return colorArr[colorArr.length - 1];
+    return findColorEntityId(colorEntity, "그레이");
   }
 }
 
@@ -153,9 +197,18 @@ async function getProductColorImg(
   config: IBrandConfig
 ): Promise<string | undefined> {
   try {
-    return await driver
-      .findElement(By.css(config.products_selector.productColorImg))
-      .getAttribute("src");
+    if (
+      (await driver.findElement(By.css("#sit_title")).getText()) ===
+      "투베러 원데이 블랙"
+    ) {
+      return await driver
+        .findElement(By.css("ul > li:nth-child(4) > div.sct_img > a > img"))
+        .getAttribute("src");
+    } else {
+      return await driver
+        .findElement(By.css(config.products_selector.productColorImg))
+        .getAttribute("src");
+    }
   } catch (e) {
     console.log("컬러 이미지 없음");
   }
@@ -202,17 +255,17 @@ async function getProductPeriod(
       .findElement(By.css(config.products_selector.productPeriod))
       .getText();
     if (!periodAlpha.includes("~")) {
-      const periodEntity = periodAlpha.split(/[·,/]/)[0];
+      const periodEntity = periodAlpha.split(/[·,/]/)[0].trim();
       const period = periodEntity
-        .replace(/1day /gi, periodList[0])
-        .replace(/2weeks /gi, periodList[1])
-        .replace(/1month /gi, periodList[2])
-        .replace(/3months /gi, periodList[3])
-        .replace(/6months /gi, periodList[4])
-        .replace(/1 year /gi, periodList[5])
-        .replace(/1개월 /gi, periodList[2])
-        .replace(/2~3개월 /gi, periodList[3])
-        .replace(/3~6개월 /gi, periodList[4]);
+        .replace(/1day/gi, periodList[0])
+        .replace(/2weeks/gi, periodList[1])
+        .replace(/1month/gi, periodList[2])
+        .replace(/3months/gi, periodList[3])
+        .replace(/6months/gi, periodList[4])
+        .replace(/1 year/gi, periodList[5])
+        .replace(/1개월/gi, periodList[2])
+        .replace(/2~3개월/gi, periodList[3])
+        .replace(/3~6개월/gi, periodList[4]);
       // console.log(`[period]: '${period}'`);
       return period;
     } else {
@@ -223,34 +276,45 @@ async function getProductPeriod(
   }
 }
 
-function getProductPeriodClassifi(period: string): string {
+function getProductPeriodClassifi(period: string, daysEntity: IDays[]): string {
   let period_classifi = "";
   switch (period) {
     case "1day":
-      period_classifi = "oneday";
+      const onedayEntity = daysEntity.find((days) => days.id === 1);
+      if (!onedayEntity) {
+        throw "error";
+      }
+      period_classifi = onedayEntity.en;
       break;
     case "2weeks":
     case "1month":
-      period_classifi = "weekly-1month";
+      const weeklyMonthEntity = daysEntity.find((days) => days.id === 2);
+      if (!weeklyMonthEntity) {
+        throw "error";
+      }
+      period_classifi = weeklyMonthEntity.en;
       break;
     case "3month":
     case "6month":
     case "1year":
-      period_classifi = "long-term";
+      const longTermEntity = daysEntity.find((days) => days.id === 3);
+      if (!longTermEntity) {
+        throw "error";
+      }
+      period_classifi = longTermEntity.en;
       break;
     default:
       period_classifi = period;
       break;
   }
-  // console.log(`[period_classifi]: ${period_classifi}`);
+  console.log(`[period_classifi]: ${period_classifi}`);
   return period_classifi;
 }
 
 async function getProductRefId(
-  driver: WebDriver,
+  currentUrl: string,
   config: IBrandConfig
 ): Promise<number> {
-  const currentUrl = await driver.getCurrentUrl();
   if (!config.dynamicUrl) {
     return Number(currentUrl.replace(config.ref_url, ""));
   } else {
@@ -259,10 +323,21 @@ async function getProductRefId(
   }
 }
 
+function getBrandId(config: IBrandConfig, brandsEntity: IBrands[]): number {
+  const brand = brandsEntity.find(
+    (brand) => brand.en_name === config.brand_name
+  );
+  if (!brand) {
+    throw "No brand";
+  }
+  return brand.id;
+}
+
 function getProduct(
   ref_id: number,
   name: string,
   color: string,
+  colorId: number,
   colorImg: string | undefined,
   price: number,
   graphic: number,
@@ -272,12 +347,14 @@ function getProduct(
   period: string,
   periodClassification: string,
   reviewCount: number,
-  brand: string
+  currentUrl: string,
+  brandId: number
 ): ILens {
   return {
     ref_id,
     name,
     color,
+    colorId,
     colorImg,
     price,
     graphic,
@@ -287,7 +364,8 @@ function getProduct(
     period,
     periodClassification,
     reviewCount,
-    brand,
+    currentUrl,
+    brandId,
   };
 }
 
@@ -300,7 +378,10 @@ async function goBackPage(driver: WebDriver): Promise<void> {
 async function crawlDetail(
   driver: WebDriver,
   product: WebElement,
-  config: IBrandConfig
+  config: IBrandConfig,
+  brandsEntity: IBrands[],
+  daysEntity: IDays[],
+  colorEntity: IColors[]
 ): Promise<void> {
   const name = await product
     .findElement(By.css(config.products_selector.productName))
@@ -314,16 +395,22 @@ async function crawlDetail(
   const detailImg = await getDetailImg(driver, config);
   const detailThumbs = await getDetailThumbs(driver, config);
   const color = await getProductColor(driver, config);
+  console.log("[color]: ", color);
+  const colorId = getProductColorId(color, colorEntity);
   const colorImg = await getProductColorImg(driver, config);
+  console.log("[colorImg]: ", colorImg);
   const price = await getProductPrice(driver, config);
   const graphic = await getProductGraphic(driver, config);
   const period = await getProductPeriod(driver, config);
-  const periodClassification = await getProductPeriodClassifi(period);
-  const ref_id = await getProductRefId(driver, config);
+  const periodClassification = getProductPeriodClassifi(period, daysEntity);
+  const currentUrl = await driver.getCurrentUrl();
+  const ref_id = await getProductRefId(currentUrl, config);
+  const brandId = getBrandId(config, brandsEntity);
   const crawlProduct = getProduct(
     ref_id,
     name,
     color,
+    colorId,
     colorImg,
     price,
     graphic,
@@ -333,7 +420,8 @@ async function crawlDetail(
     period,
     periodClassification,
     reviewCount,
-    config.brand_name
+    currentUrl,
+    brandId
   );
   config.products.push(crawlProduct);
   await goBackPage(driver);
@@ -343,18 +431,28 @@ async function crawlDetail(
 
 (async function main() {
   let LENS_LIST_ENTITY: ILens[] = [];
-  let configs: IBrandConfig[] = [lensTownConfig, olensConfig, lensmeConfig];
   const lensRepo = new LensRepo();
+  const brandsEntity = await lensRepo.getBrandsEntity();
+  const daysEntity = await lensRepo.getDaysEntity();
+  const colorEntity = await lensRepo.getColorEntity();
+  let configs: IBrandConfig[] = [lensTownConfig, olensConfig, lensmeConfig];
+
   for (let config of configs) {
-    await mainCrawler(config);
+    await mainCrawler(config, brandsEntity, daysEntity, colorEntity);
     LENS_LIST_ENTITY.push(...config.products);
   }
+
   lensRepo.addLensInfo(LENS_LIST_ENTITY);
 })();
 
 //----------------------------------- Main Crawler ----------------------------------------
 
-async function mainCrawler(config: IBrandConfig): Promise<void> {
+async function mainCrawler(
+  config: IBrandConfig,
+  brandsEntity: IBrands[],
+  daysEntity: IDays[],
+  colorEntity: IColors[]
+): Promise<void> {
   let driver = await goMainPage(config);
   const categories = await getCategories(driver, config);
 
@@ -364,114 +462,15 @@ async function mainCrawler(config: IBrandConfig): Promise<void> {
 
     for (let j = 0; j < products.length; j++) {
       const products = await getProducts(driver, config);
-      await crawlDetail(driver, products[j], config);
+      await crawlDetail(
+        driver,
+        products[j],
+        config,
+        brandsEntity,
+        daysEntity,
+        colorEntity
+      );
     }
   }
   await driver.quit();
 }
-
-// (async function mainCrawler() {
-//   const brands = [olensConfig, lensTownConfig];
-//   const crawlerApi = new CrawlerApi();
-//   const lensRepo = new LensRepo();
-//   const LENS_LIST_ENTITY = [];
-
-//   for await (let brand of brands) {
-//     let driver = await crawlerApi.goMainPage(brand.url);
-//     const categories = await crawlerApi.getCategories(driver, brand.categories);
-
-//     for (let i = 0; i < categories.length; i++) {
-//       const categories = await crawlerApi.getCategories(driver, brand.categories); // pink cate 안눌림
-
-//       if (brand.isPageHeader) {
-//         await crawlerApi.removeElement(driver, brand.products_selector.pageHeader);
-//         await crawlerApi.clickElement(categories[i]);
-//       } else {
-//         await crawlerApi.clickElementByJs(driver, categories[i]);
-//       }
-
-//       const elements = await crawlerApi.getElementList(driver, brand.products_selector.productList);
-
-//       for (let j = 0; j < elements.length; j++) {
-//         if (!brand.has_a_tag) {
-//           const categories = await crawlerApi.getCategories(driver, brand.categories);
-//           await crawlerApi.clickElementByJs(driver, categories[i]);
-//         }
-
-//         const elements = await crawlerApi.getElementList(driver, brand.products_selector.productList);
-//         const name = await crawlerApi.getProductName(elements[j], brand.products_selector.productName);
-//         const img = await crawlerApi.getProductImg(elements[j], brand.products_selector.productImg);
-
-//         let reviewCount = "";
-
-//         if (brand.has_a_tag) {
-//           await crawlerApi.clickElement(elements[j]);
-//           reviewCount = await crawlerApi.getProductReviewCount(
-//             driver,
-//             brand.products_selector.productReviewCount,
-//             brand.review
-//           );
-//         } else {
-//           await crawlerApi.clickElementByJs(driver, elements[j]);
-//           const reviewBtn = await crawlerApi.getElementsByClassName(driver, brand.products_selector.productReviewBtn);
-//           if (reviewBtn) {
-//             reviewCount = await crawlerApi.getProductReviewCount(
-//               driver,
-//               brand.products_selector.productReviewCount,
-//               brand.review
-//             );
-//           } else {
-//             reviewCount = 0;
-//           }
-//         }
-
-//         let detailImg = "";
-
-//         if (brand.has_product_detail_img_optional) {
-//           const detailImgEle = await crawlerApi.getElementByQuerySelector(
-//             driver,
-//             brand.products_selector.productDetailImg
-//           );
-//           if (detailImgEle) {
-//             detailImg = await crawlerApi.getProductDetailImg(driver, brand.products_selector.productDetailImg);
-//           }
-//         } else {
-//           detailImg = await crawlerApi.getProductDetailImg(driver, brand.products_selector.productDetailImg);
-//         }
-
-//         const thumbnails = await crawlerApi.getProductDetailThumbnails(
-//           driver,
-//           brand.products_selector.productDetailThumbs
-//         );
-//         const color = await crawlerApi.getProductColor(driver, brand.products_selector.productColor);
-//         const colorImg = await crawlerApi.getProductColorImg(driver, brand.products_selector.productColorImg);
-//         const price = await crawlerApi.getProductPrice(driver, brand.products_selector.productPrice);
-//         const graphic = await crawlerApi.getProductGraphic(driver, brand.products_selector.productGraphic);
-//         const period = await crawlerApi.getProductPeriod(driver, brand.products_selector.productPeriod);
-//         const currentUrl = await driver.getCurrentUrl();
-//         const ref_id = await crawlerApi.getProductRefId(currentUrl, brand.ref_url);
-//         const productEntity = crawlerApi.getProductInfos(
-//           ref_id,
-//           name,
-//           color,
-//           colorImg,
-//           price,
-//           graphic,
-//           img,
-//           detailImg,
-//           thumbnails,
-//           period,
-//           reviewCount,
-//           brand.brand_name
-//         );
-//         LENS_LIST_ENTITY.push(productEntity);
-
-//         await crawlerApi.goBackPage(driver, 1000);
-//       }
-//     }
-
-//     await driver.quit();
-//   }
-
-//   lensRepo.addLensInfo(LENS_LIST_ENTITY);
-// })();
